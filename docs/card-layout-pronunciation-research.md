@@ -88,3 +88,11 @@ B：如要求多端音色一致，采用“同一模板+预生成MP3+有来源IP
 证据：[Anki TTS 实现](https://github.com/ankitects/anki/blob/b3c23522d1e3cecdb2a2f999aa8cb32396fdb8b1/qt/aqt/tts.py)、[官方选声说明](https://docs.ankiweb.net/templates/fields.html#text-to-speech)。本次使用 GitHub code 搜索与本机安装源码，无需多代理或新依赖。复用原生 voices 配置；不采用预生成音频，因为本地选择错误已可直接修正。未能通过源码证明用户感知的响度差已消除，需要重新试听。其他设备若没有指定声音，Anki 原生会退回语言匹配，移动端选声需要单独验收。
 
 三卡读回与 50 项测试通过；两张搭配音标清除、单词音标保留、播放控件存在、调度字段不变。迁移前备份及迁移后读回均在私有 acceptance 目录。回滚使用 pre-samantha-backup.json 恢复模板与相关字段。
+
+### 默认仅自动播放美音
+
+用户保留 Samantha，要求 US 自动、UK 手动。采用模板触发现有原生美音按钮的方式：验收牌组关闭 Anki 全量自动播放；正面脚本仅点击 `.default-audio` 中的 US 控件一次，UK 控件不属于此容器。背面例句同样仅使用美音。不得开启牌组全量自动播放，否则与模板触发叠加。此模板依赖牌组设置；其他使用同一模型的牌组也须禁用全量自动播放后才能保证行为。
+
+方案对照：继续原生 TTS 加定向触发改动小；预生成双音频可独立控制，但增加媒体生成与同步，暂不采用。参考 [Anki 论坛选择性自动播放讨论](https://forums.ankiweb.net/t/disabling-audio-autoplay-for-certain-fields/6318/3)，本机 reviewer/sound 源码确认原生按钮经 `play:q:index` 点播。此为模板方案，移动端仍须验收，不声称所有客户端行为一致。
+
+本机系统声音枚举目前将 Samantha 显示为本地化名称，故 voices 同时列出 Apple_Samantha 与 Apple_Samantha_(英语（美国）)，均明确指定 Samantha。三卡模板及设置读回通过，调度记录未变；脚本控制测试确认仅触发默认控件一次，50 项现有测试通过。实际 Anki 翻面播放听感与移动端待用户验收。备份在私有 acceptance/pre-selective-autoplay-*.json。

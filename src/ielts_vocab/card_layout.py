@@ -1,4 +1,4 @@
-"""Native Anki TTS and a compact reading layout; no remote assets or JavaScript."""
+"""Native Anki TTS and a compact reading layout; no remote assets."""
 
 FRONT = """<main class="sheet">
 <div class="eyebrow">词汇 · RECOGNITION</div>
@@ -6,7 +6,7 @@ FRONT = """<main class="sheet">
 <div class="pronunciation-grid">
 <div class="pronunciation-row primary"><span class="badge">US · 主</span>
 <div class="ipa">{{#IPA_US}}{{IPA_US}}{{/IPA_US}}</div>
-<div class="audio">{{#PronunciationText}}{{tts en_US voices=Apple_Samantha:PronunciationText}}{{/PronunciationText}}{{^PronunciationText}}{{tts en_US voices=Apple_Samantha:Lemma}}{{/PronunciationText}}</div></div>
+<div class="audio default-audio">{{#PronunciationText}}{{tts en_US voices=Apple_Samantha,Apple_Samantha_(英语（美国）):PronunciationText}}{{/PronunciationText}}{{^PronunciationText}}{{tts en_US voices=Apple_Samantha,Apple_Samantha_(英语（美国）):Lemma}}{{/PronunciationText}}</div></div>
 <div class="pronunciation-row"><span class="badge">UK</span>
 <div class="ipa">{{#IPA_UK}}{{IPA_UK}}{{/IPA_UK}}</div>
 <div class="audio">{{#PronunciationText}}{{tts en_GB:PronunciationText}}{{/PronunciationText}}{{^PronunciationText}}{{tts en_GB:Lemma}}{{/PronunciationText}}</div></div>
@@ -20,12 +20,27 @@ BACK = """<main class="sheet">
 <section id="answer"><h2>核心含义</h2><p class="meaning">{{PrimaryMeaning}}</p></section>
 {{#PrimarySentence}}<section><h2>原文例句 <span class="badge">US</span></h2>
 <p class="sentence">{{PrimarySentence}}</p>
-<div class="pronunciation">{{tts en_US voices=Apple_Samantha:PrimarySentence}}</div></section>{{/PrimarySentence}}
+<div class="pronunciation default-audio">{{tts en_US voices=Apple_Samantha,Apple_Samantha_(英语（美国）):PrimarySentence}}</div></section>{{/PrimarySentence}}
 {{#Collocations}}<section><h2>搭配与用法</h2><div class="usage">{{Collocations}}</div></section>{{/Collocations}}
 {{#IPA_Source}}<details><summary>音标来源</summary><div class="metadata">{{IPA_Source}}</div></details>{{/IPA_Source}}
 {{#Sources}}<details><summary>查看来源</summary><div class="metadata">{{Sources}}</div></details>{{/Sources}}
 {{#UserNotes}}<details><summary>备注</summary><div class="metadata">{{UserNotes}}</div></details>{{/UserNotes}}
 </main>"""
+
+# The deck must disable native autoplay: it otherwise queues both accents.
+# Trigger the existing native replay control, preserving manual UK playback.
+DEFAULT_AUDIO_SCRIPT = """<script>
+(function () {
+  var container = document.querySelector('.default-audio');
+  if (!container || container.dataset.playRequested === 'yes') return;
+  var button = container.querySelector('.replay-button, .replaybutton, .soundLink');
+  if (!button) return;
+  container.dataset.playRequested = 'yes';
+  button.click();
+})();
+</script>"""
+FRONT += DEFAULT_AUDIO_SCRIPT
+BACK += DEFAULT_AUDIO_SCRIPT
 
 CSS = """.card {font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 font-size:19px;text-align:left;line-height:1.65;margin:0;padding:24px 18px;
