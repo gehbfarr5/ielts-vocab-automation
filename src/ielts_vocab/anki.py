@@ -6,6 +6,7 @@ import time
 import urllib.request
 from datetime import datetime, timezone
 
+from .card_layout import BACK, CSS, FRONT
 from .models import Candidate, digest, study_day
 from .store import Store
 
@@ -26,12 +27,13 @@ FIELDS = [
     "Context2SenseID",
     "Sources",
     "UserNotes",
+    "PronunciationText",
 ]
 TEMPLATES = [
     {
         "Name": "Recognition",
-        "Front": "{{RecognitionPrompt}}",
-        "Back": '{{FrontSide}}<hr id="answer">{{PrimaryMeaning}}<br>{{PrimarySentence}}<br>{{Collocations}}',
+        "Front": FRONT,
+        "Back": BACK,
     },
     *[
         {
@@ -80,9 +82,7 @@ class Anki:
                 "createModel",
                 modelName=MODEL,
                 inOrderFields=FIELDS,
-                css=".card {font-family: -apple-system,sans-serif; font-size:22px;"
-                "text-align:left; line-height:1.6; padding:20px;} "
-                ".nightMode .card {color:#eee;}",
+                css=CSS,
                 isCloze=False,
                 cardTemplates=TEMPLATES,
             )
@@ -147,6 +147,7 @@ def reconcile_reviews(store, anki, timezone_name, rollover_hour):
 def render(candidate: Candidate):
     return {
         "RecognitionPrompt": html.escape(candidate.lemma),
+        "PronunciationText": html.escape(candidate.lemma),
         "PrimaryMeaning": html.escape(candidate.context_meaning_zh),
         "PrimarySentence": html.escape(candidate.source_sentence),
         "Collocations": "<br>".join(map(html.escape, candidate.collocations)),
