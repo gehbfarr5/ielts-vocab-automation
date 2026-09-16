@@ -9,6 +9,7 @@ from pathlib import Path
 
 from wordfreq import zipf_frequency
 
+from .context import restrict_history
 from .models import Analysis, digest, lemma_key
 from .palette import palette_for
 from .quality import check_candidate
@@ -43,20 +44,21 @@ def evidence_pack(submission, lines, store=None):
         for w in words
     ]
     known = []
+    surfaces = {}
     if store is not None:
         for row in store.db.execute(
             "SELECT DISTINCT lemma_key,sense_key,payload FROM candidates WHERE state IN ('written','enriched')"
         ):
             c = json.loads(row["payload"])
-            if c["lemma"].casefold() in " ".join(words).casefold():
-                known.append(
-                    {
-                        "lemma": c["lemma"],
-                        "sense_label": c["sense_label"],
-                        "meaning": c["context_meaning_zh"],
-                        "sense_id": row["sense_key"],
-                    }
-                )
+            surfaces.setdefault(c["lemma"], []).append(c.get("surface_form", c["lemma"]))
+            known.append(
+                {
+                    "lemma": c["lemma"],
+                    "sense_label": c["sense_label"],
+                    "meaning": c["context_meaning_zh"],
+                    "sense_id": row["sense_key"],
+                }
+            )
     history = None
     if store is not None:
         snapshot = store.db.execute(
@@ -73,6 +75,7 @@ def evidence_pack(submission, lines, store=None):
         "ocr_lines": lines,
         "additional_evidence": frequency,
         "known_senses": known,
+        "known_surfaces": surfaces,
         "anki_review_history": history,
         "cefr": None,
         "academic_membership": None,
@@ -84,9 +87,29 @@ def evidence_pack(submission, lines, store=None):
     }
 
 
-def codex_analyze(image: Path | None, evidence: dict, work: Path, *, allow_cloud: bool):
+DEFAULT_MODEL = "gpt-5.6-sol"
+DEFAULT_EFFORT = "medium"
+
+
+def codex_analyze(
+    image: Path | None,
+    evidence: dict,
+    work: Path,
+    *,
+    allow_cloud: bool,
+    model=DEFAULT_MODEL,
+    effort=DEFAULT_EFFORT,
+):
     if not allow_cloud:
         raise ValueError("Cloud analysis is not enabled")
+    if not re.fullmatch(r"[a-zA-Z0-9._-]+", model) or effort not in {
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+    }:
+        raise ValueError("Invalid analyzer model/effort")
     work.mkdir(parents=True, exist_ok=True, mode=0o700)
     schema = work / "analysis.schema.json"
     schema.write_text(json.dumps(Analysis.model_json_schema()))
@@ -108,11 +131,16 @@ def codex_analyze(image: Path | None, evidence: dict, work: Path, *, allow_cloud
         for item in evidence.get("additional_evidence", [])
         if item.get("kind") != "frequency" or item["form"].casefold() in text
     ]
+    supplied = restrict_history(supplied)
     prompt = INSTRUCTIONS + "\nEvidence:\n" + json.dumps(supplied, ensure_ascii=False)
     command = [
         "codex",
         "exec",
         "--ignore-user-config",
+        "--model",
+        model,
+        "-c",
+        f'model_reasoning_effort="{effort}"',
         "--ephemeral",
         "--sandbox",
         "read-only",
@@ -146,6 +174,23 @@ def codex_analyze(image: Path | None, evidence: dict, work: Path, *, allow_cloud
         command.extend(["--image", str(image)])
     command.append("-")
     result = subprocess.run(command, input=prompt, text=True, capture_output=True, timeout=180)
+    observed = {}
+    for key in ("model", "reasoning effort"):
+        match = re.search(r"^" + re.escape(key) + r": ([^\n]+)$", result.stderr, re.MULTILINE)
+        if match:
+            observed[key] = match.group(1).strip()
+    metadata = {
+        "requested_model": model,
+        "requested_effort": effort,
+        "observed_cli": observed,
+        "at": time.time(),
+        "returncode": result.returncode,
+        "history_entry_count": len((supplied.get("anki_review_history") or {}).get("entries", [])),
+        "ocr_line_count": len(supplied["ocr_lines"]),
+    }
+    audit = work / "analyzer-call.json"
+    audit.write_text(json.dumps(metadata, ensure_ascii=False, indent=2))
+    audit.chmod(0o600)
     if result.returncode:
         # Logs may include user inputs; keep raw CLI output out of shared diagnostics.
         raise RuntimeError(

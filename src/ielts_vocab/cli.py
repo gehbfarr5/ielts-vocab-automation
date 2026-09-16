@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .analysis import codex_analyze, evidence_pack, save_analysis
+from .analysis import DEFAULT_EFFORT, DEFAULT_MODEL, codex_analyze, evidence_pack, save_analysis
 from .anki import Anki, enrich, execute, make_plan, reconcile_reviews
 from .ingest import receive, scan
 from .models import Analysis, Candidate, DayState, digest, study_day
@@ -90,6 +90,8 @@ def process(store, root, config):
                 evidence,
                 work,
                 allow_cloud=True,
+                model=config.get("analyzer_model", DEFAULT_MODEL),
+                effort=config.get("analyzer_reasoning_effort", DEFAULT_EFFORT),
             )
             save_analysis(
                 store,
