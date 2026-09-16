@@ -159,6 +159,7 @@ def save_analysis(store, submission_id, analysis: Analysis, evidence: dict, *, c
         raise ValueError("Unknown submission")
     allowed_refs = {evidence["source_id"], evidence["inference_id"]}
     allowed_refs.update(e["id"] for e in evidence.get("additional_evidence", []))
+    allowed_refs.update(s["sense_id"] for s in evidence.get("known_senses", []))
     with store.transaction():
         for c in analysis.candidates:
             if not set(c.evidence_refs) <= allowed_refs:

@@ -172,3 +172,34 @@ def test_text_analyzer_omits_image_and_unrelated_lines(monkeypatch, tmp_path, ca
     assert (
         codex_analyze(None, evidence, tmp_path, allow_cloud=True).candidates[0].lemma == "maintain"
     )
+
+
+def test_supplied_known_sense_reference_is_valid_but_invented_one_is_not(
+    store, tmp_path, image_bytes, candidate
+):
+    r = receive(store, tmp_path, image_bytes)
+    ev = {
+        "source_id": "source:test",
+        "inference_id": "inferred:agent-gloss",
+        "ocr_lines": [{"text": candidate.source_sentence}],
+        "known_senses": [{"sense_id": "known-sense-123"}],
+    }
+    rejected = candidate.model_copy(
+        update={
+            "decision": "REJECT",
+            "evidence_refs": ["known-sense-123"],
+        }
+    )
+    save_analysis(
+        store, r["submission_id"], Analysis(candidates=[rejected], notes=""), ev, calibrated=False
+    )
+    assert store.db.execute("SELECT state FROM candidates").fetchone()[0] == "rejected"
+    invented = rejected.model_copy(update={"evidence_refs": ["not-supplied"]})
+    with pytest.raises(ValueError, match="Unknown evidence"):
+        save_analysis(
+            store,
+            r["submission_id"],
+            Analysis(candidates=[invented], notes=""),
+            ev,
+            calibrated=False,
+        )
