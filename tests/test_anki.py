@@ -121,3 +121,26 @@ def test_readback_detects_silent_update_failure(store, tmp_path, image_bytes, ca
     with pytest.raises(AnkiError, match="readback"):
         execute(store, a, "op2")
     assert store.usage("2026-09-16")["cards"] == 2
+
+
+def test_pre_inventory_recovery_only_adopts_completed_write(
+    store, tmp_path, image_bytes, candidate
+):
+    from ielts_vocab.anki import reconcile_completed_writes
+
+    c = put_candidate(store, tmp_path, image_bytes, candidate)
+    a = FakeAnki()
+    open_day(store)
+    plan = make_plan(store, a, c, "IELTS")
+    store.reserve("op", c["id"], c["core_key"], "Recognition", False, "2026-09-16", plan)
+    a.fail_after_add = True
+    with pytest.raises(TimeoutError):
+        execute(store, a, "op")
+    original = a.notes[1]["PrimaryMeaning"]
+    a.notes[1]["PrimaryMeaning"] = "external change"
+    reconcile_completed_writes(store, a)
+    assert store.db.execute("SELECT state FROM operations").fetchone()[0] == "write_uncertain"
+    a.notes[1]["PrimaryMeaning"] = original
+    reconcile_completed_writes(store, a)
+    assert a.adds == 1
+    assert store.db.execute("SELECT state FROM operations").fetchone()[0] == "written"

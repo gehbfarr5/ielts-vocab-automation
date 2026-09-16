@@ -15,6 +15,9 @@ class Remote:
         self.due, self.cards, self.fail = due or [], cards or [], fail
         self.syncs = 0
 
+    def find_entry(self, entry):
+        return []
+
     def call(self, action, **kwargs):
         if action == "sync":
             self.syncs += 1
@@ -78,9 +81,12 @@ def test_reservations_are_charged_before_new_admission(
     c = put_candidate(store, tmp_path, image_bytes, candidate)
     config["daily_new_limit"] = 1
     result = refresh_day(store, Remote(), config)
-    store.reserve("op", c["id"], c["core_key"], "card", False, result["day"], {})
+    store.reserve("op", c["id"], c["core_key"], "card", False, result["day"], {"entry": "test"})
     store.db.execute("DELETE FROM settings WHERE key='last_admission_sync'")
-    assert refresh_day(store, Remote(), config)["state"] == "waiting_budget"
+    assert refresh_day(store, Remote(), config)["state"] == "ready"
+    # Existing reservation may complete; it cannot admit a second card.
+    with pytest.raises(ValueError, match="exhausted"):
+        store.reserve("another", c["id"], c["core_key"], "another", False, result["day"], {})
 
 
 def test_recovery_is_not_reopened_by_automation(store, config):

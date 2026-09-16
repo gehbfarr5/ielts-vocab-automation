@@ -25,6 +25,15 @@ from .unattended import refresh_day
 DEFAULT_ROOT = Path.home() / "Library/Application Support/IELTSVocab"
 
 
+def record_worker_status(root, result):
+    path = root / "worker-status.tmp"
+    path.write_text(
+        json.dumps({"observed_at": time.time(), "result": result}, ensure_ascii=False, indent=2)
+    )
+    path.chmod(0o600)
+    path.replace(root / "worker-status.json")
+
+
 def anki_client(config):
     key_path = config.get("anki_key_file")
     return Anki(config["anki_profile"], token_from_file(key_path) if key_path else None)
@@ -37,7 +46,8 @@ def process(store, root, config):
     if store.mining_paused(pending):
         return {"state": "backpressure", "pending_cores": pending}
     rows = store.db.execute(
-        "SELECT * FROM submissions WHERE state='received' ORDER BY created LIMIT 3"
+        "SELECT * FROM submissions WHERE state='received' OR (state='retry_wait' AND next_retry<=?) ORDER BY created LIMIT 3",
+        (time.time(),),
     ).fetchall()
     results = []
     for row in rows:
@@ -64,7 +74,12 @@ def process(store, root, config):
                 (time.time() - 86400,),
             ).fetchone()[0]
             if calls >= config.get("max_analyzer_calls_per_24h", 10):
-                raise ValueError("Analyzer rolling 24h call budget exhausted")
+                store.db.execute(
+                    "UPDATE submissions SET state='retry_wait',next_retry=?,error=? WHERE id=?",
+                    (time.time() + 3600, "Analyzer call budget exhausted; waiting", sid),
+                )
+                results.append({"submission": sid, "state": "waiting_model_budget"})
+                continue
             store.event(
                 "analyzer_call",
                 sid,
@@ -76,15 +91,25 @@ def process(store, root, config):
                 work,
                 allow_cloud=True,
             )
-            save_analysis(store, sid, analyzed, evidence, calibrated=config["calibration_verified"])
+            save_analysis(
+                store,
+                sid,
+                analyzed,
+                evidence,
+                calibrated=config["calibration_verified"],
+                strict=True,
+            )
             results.append({"submission": sid, "state": "analyzed"})
         except Exception as e:
+            attempts = row["attempts"] + 1
+            retryable = isinstance(e, (OSError, subprocess.SubprocessError, RuntimeError))
+            state = "retry_wait" if retryable and attempts < 3 else "error"
             store.db.execute(
-                "UPDATE submissions SET state='error',error=?,attempts=attempts+1 WHERE id=?",
-                (str(e), sid),
+                "UPDATE submissions SET state=?,error=?,attempts=?,next_retry=? WHERE id=?",
+                (state, str(e), attempts, time.time() + min(3600, 60 * 2**attempts), sid),
             )
             store.event("processing_error", sid, {"type": type(e).__name__})
-            results.append({"submission": sid, "state": "error", "reason": str(e)})
+            results.append({"submission": sid, "state": state, "reason": str(e)})
     return results
 
 
@@ -108,15 +133,20 @@ def write_pending(store, config, prepared=None):
     for op in unresolved:
         execute(store, a, op["id"], current_day=day)
     rows = store.db.execute(
-        "SELECT * FROM candidates WHERE state IN ('pending','awaiting_pronunciation') ORDER BY priority DESC,created LIMIT 5"
+        "SELECT * FROM candidates WHERE state IN ('pending','awaiting_pronunciation') ORDER BY priority DESC,created LIMIT 50"
     ).fetchall()
+    new_writes = 0
     for row in rows:
+        if new_writes >= 5:
+            break
         plan = make_plan(store, a, row, config["anki_deck"])
         if plan["kind"] == "enrich":
             enrich(store, a, row, plan)
             continue
         if plan["kind"] == "create":
-            ipa = ipa_fields(Candidate.model_validate_json(row["payload"]), config.get("ipa_cache"))
+            ipa = ipa_fields(
+                Candidate.model_validate_json(row["payload"]), config.get("ipa_cache"), store
+            )
             if ipa is None:
                 store.db.execute(
                     "UPDATE candidates SET state='awaiting_pronunciation' WHERE id=?", (row["id"],)
@@ -148,9 +178,14 @@ def write_pending(store, config, prepared=None):
             plan,
         )
         execute(store, a, op_id, current_day=day)
-    if store.db.execute("SELECT 1 FROM operations WHERE state='written'").fetchone():
+        new_writes += 1
+    if (
+        store.db.execute("SELECT 1 FROM operations WHERE state='written'").fetchone()
+        or store.db.execute("SELECT 1 FROM settings WHERE key='sync_dirty'").fetchone()
+    ):
         a.call("sync")
         store.db.execute("UPDATE operations SET state='sync_requested' WHERE state='written'")
+        store.db.execute("DELETE FROM settings WHERE key='sync_dirty'")
         store.event("sync_requested", day, {"mobile_verified": False})
     return store.status()
 
@@ -272,6 +307,7 @@ def main():
                     Analysis.model_validate_json(args.file.read_text()),
                     ev,
                     calibrated=config["calibration_verified"],
+                    strict=True,
                 )
                 result = store.status()
             else:
@@ -281,12 +317,12 @@ def main():
                         result = write_pending(store, config)
                     else:
                         prepared = None
+                        if args.command == "run-once":
+                            scan(store, root, Path(config["inbox"]))
                         if config["writes_enabled"] or config.get("unattended_enabled"):
                             require_writer(config)
                             if config.get("history_authority") == "synced_mac":
                                 prepared = refresh_day(store, anki_client(config), config)
-                        if args.command == "run-once":
-                            scan(store, root, Path(config["inbox"]))
                         result = process(store, root, config)
                         if not config["writes_enabled"] and prepared is not None:
                             result = {
@@ -299,8 +335,14 @@ def main():
                                 "analysis": result,
                                 "anki": write_pending(store, config, prepared),
                             }
+        if args.command == "run-once":
+            record_worker_status(root, result)
         print(json.dumps(result, ensure_ascii=False, indent=2))
     except Exception as e:
+        if args.command == "run-once" and not isinstance(e, BlockingIOError):
+            record_worker_status(
+                root, {"state": "error", "type": type(e).__name__, "reason": str(e)}
+            )
         print(
             json.dumps(
                 {"state": "error", "type": type(e).__name__, "reason": str(e)}, ensure_ascii=False

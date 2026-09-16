@@ -6,7 +6,7 @@ import json
 import time
 from datetime import datetime, timezone
 
-from .anki import reconcile_reviews
+from .anki import reconcile_completed_writes, reconcile_reviews
 from .models import DayState, study_day
 
 
@@ -30,6 +30,9 @@ def refresh_day(store, anki, config):
         return {"state": "waiting_sync_interval"}
     # No cached success may authorize writes after a failed sync.
     anki.call("sync")
+    reconcile_completed_writes(store, anki)
+    store.db.execute("UPDATE operations SET state='sync_requested' WHERE state='written'")
+    store.db.execute("DELETE FROM settings WHERE key='sync_dirty'")
     synced_at = time.time()
     store.db.execute(
         "INSERT OR REPLACE INTO settings VALUES('last_admission_sync',?)", (str(synced_at),)
@@ -99,6 +102,13 @@ def refresh_day(store, anki, config):
     )
     if due:
         return {"state": "waiting_reviews", "due_count": len(due)}
-    if usage["cores"] >= limit or usage["cards"] >= limit:
+    unresolved = store.db.execute(
+        "SELECT 1 FROM operations WHERE state IN ('reserved','writing','write_uncertain')"
+    ).fetchone()
+    if (
+        usage["cores"] > limit
+        or usage["cards"] > limit
+        or (not unresolved and (usage["cores"] >= limit or usage["cards"] >= limit))
+    ):
         return {"state": "waiting_budget", "usage": usage}
     return {"state": "ready", "day": day, "usage": usage}

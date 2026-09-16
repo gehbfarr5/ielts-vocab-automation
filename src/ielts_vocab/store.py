@@ -48,6 +48,9 @@ class Store:
                 self.db.execute(
                     "ALTER TABLE submissions ADD COLUMN mark_scheme TEXT NOT NULL DEFAULT 'yellow-orange-blue-v1'"
                 )
+        columns = {row[1] for row in self.db.execute("PRAGMA table_info(submissions)")}
+        if "next_retry" not in columns:
+            self.db.execute("ALTER TABLE submissions ADD COLUMN next_retry REAL NOT NULL DEFAULT 0")
         path.chmod(0o600)
 
     @contextmanager

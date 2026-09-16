@@ -325,3 +325,21 @@ def enrich(store, anki, candidate_row, plan):
             "UPDATE candidates SET state='enriched' WHERE id=?", (candidate_row["id"],)
         )
         store.event("enriched", candidate_row["id"], {"note_id": nid})
+        store.db.execute("INSERT OR REPLACE INTO settings VALUES('sync_dirty','true')")
+
+
+def reconcile_completed_writes(store, anki):
+    """Recover durable writes before comparing inventory; never creates or edits a note."""
+    rows = store.db.execute(
+        "SELECT id,plan FROM operations WHERE state IN ('reserved','writing','write_uncertain')"
+    ).fetchall()
+    for row in rows:
+        plan = json.loads(row["plan"])
+        found = anki.find_entry(plan["entry"])
+        if not found:
+            continue
+        if len(found) != 1:
+            raise AnkiError("Ambiguous interrupted write")
+        actual = anki.fields(found[0])
+        if all(actual.get(k) == v for k, v in plan["fields"].items() if k != "UserNotes"):
+            execute(store, anki, row["id"])
