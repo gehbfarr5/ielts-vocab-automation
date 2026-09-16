@@ -40,7 +40,7 @@ def color_evidence(image: Path, lines: list[dict], scheme=CURRENT_SCHEME):
         pixels = region.load()
         for r, g, b in (pixels[x, y] for y in range(region.height) for x in range(region.width)):
             hue, sat, val = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
-            if sat < (0.18 if scheme == LEGACY_SCHEME else 0.07) or val < 0.35:
+            if sat < (0.18 if scheme == LEGACY_SCHEME else 0.05) or val < 0.35:
                 continue
             deg = hue * 360
             if scheme != LEGACY_SCHEME:

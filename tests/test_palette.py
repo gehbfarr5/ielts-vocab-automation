@@ -53,3 +53,20 @@ def test_old_database_migration_preserves_legacy(tmp_path):
     store = Store(p)
     assert store.db.execute("SELECT mark_scheme FROM submissions").fetchone()[0] == LEGACY_SCHEME
     store.db.close()
+
+
+def test_v2_blue_retains_old_meaning(tmp_path):
+    p = tmp_path / "blue.png"
+    Image.new("RGB", (20, 20), "#6E83B0").save(p)
+    old = color_evidence(p, [{"bbox": [0, 0, 1, 1]}], "goodnotes-muted-v2")[0]
+    new = color_evidence(p, [{"bbox": [0, 0, 1, 1]}])[0]
+    assert old["color_votes"]["phrase_context_unclear"] == 400
+    assert new["color_votes"]["partial"] == 400
+
+
+@pytest.mark.parametrize("rgb", [(255, 255, 255), (180, 180, 180), (0, 0, 0), (245, 244, 240)])
+def test_neutral_background_has_no_color_votes(tmp_path, rgb):
+    p = tmp_path / "neutral.png"
+    Image.new("RGB", (20, 20), rgb).save(p)
+    result = color_evidence(p, [{"bbox": [0, 0, 1, 1]}])[0]
+    assert sum(result["color_votes"].values()) == 0
