@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ielts-vocab-automation"
+version = "0.1.0"
+description = "Local-first highlighted reading to Anki, with evidence and learning budgets"
+requires-python = ">=3.12"
+dependencies = ["pillow>=11,<13", "pydantic>=2.10,<3", "wordfreq>=3.1,<4"]
+
+[project.scripts]
+ielts-vocab = "ielts_vocab.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ielts_vocab"]
