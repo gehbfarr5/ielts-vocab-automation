@@ -131,3 +131,19 @@ def test_unbacked_academic_score_rejected(store, tmp_path, image_bytes, candidat
         save_analysis(
             store, r["submission_id"], Analysis(candidates=[c], notes=""), ev, calibrated=True
         )
+
+
+def test_deferred_candidate_can_be_reevaluated_without_duplicate(
+    store, tmp_path, image_bytes, candidate
+):
+    r = receive(store, tmp_path, image_bytes)
+    ev = {
+        "source_id": "source:test",
+        "inference_id": "inferred:agent-gloss",
+        "ocr_lines": [{"text": candidate.source_sentence}],
+    }
+    result = Analysis(candidates=[candidate], notes="")
+    save_analysis(store, r["submission_id"], result, ev, calibrated=False)
+    save_analysis(store, r["submission_id"], result, ev, calibrated=True)
+    assert store.db.execute("SELECT count(*) FROM candidates").fetchone()[0] == 1
+    assert store.db.execute("SELECT state FROM candidates").fetchone()[0] == "pending"

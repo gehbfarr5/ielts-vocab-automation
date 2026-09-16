@@ -35,7 +35,7 @@ def process(store, root, config):
     pending = store.db.execute(
         "SELECT count(DISTINCT core_key) FROM candidates WHERE state='pending'"
     ).fetchone()[0]
-    if pending >= 60:
+    if store.mining_paused(pending):
         return {"state": "backpressure", "pending_cores": pending}
     rows = store.db.execute(
         "SELECT * FROM submissions WHERE state='received' ORDER BY created LIMIT 3"

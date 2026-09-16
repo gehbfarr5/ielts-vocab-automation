@@ -167,7 +167,9 @@ def save_analysis(store, submission_id, analysis: Analysis, evidence: dict, *, c
             cid = digest([row["sha"], key, sense])[:32]
             state = {"ACCEPT": "pending", "DEFER": "deferred", "REJECT": "rejected"}[c.decision]
             store.db.execute(
-                "INSERT OR IGNORE INTO candidates VALUES(?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO candidates VALUES(?,?,?,?,?,?,?,?,?) "
+                "ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,priority=excluded.priority,state=excluded.state "
+                "WHERE candidates.state IN ('pending','deferred','rejected')",
                 (
                     cid,
                     submission_id,

@@ -123,3 +123,11 @@ def test_uncertain_unwritten_operation_cannot_cross_into_recovery(
     with pytest.raises(ValueError, match="gate closed"):
         execute(store, a, "op", current_day="2026-09-17")
     assert a.adds == 0
+
+
+def test_mining_backpressure_requires_drain_below_thirty(store):
+    assert not store.mining_paused(50)
+    assert store.mining_paused(60)
+    assert store.mining_paused(45)
+    assert store.mining_paused(30)
+    assert not store.mining_paused(29)

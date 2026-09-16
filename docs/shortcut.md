@@ -12,7 +12,7 @@
 
 Mac 本地对应目录通常是 `~/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/IELTSInbox`，需核验实际路径后写入本地 config.json 的 inbox。CLI `shortcuts run NAME --input-path /absolute/screenshot.png` 可用于 Mac 合成样本测试，但不能替代 iPad Share Sheet 验收。
 
-本轮通过原生编辑器创建了入口草稿，但首次命令行运行未完成，尚不能称为交付成功的移动入口；没有导出或发布用户现有快捷指令。后续必须验证文件实际到达、同名保存、多图与 iCloud 同步，再给入口 PASS。
+本轮通过原生编辑器创建了“雅思截图提交（待验收）”入口草稿，但首次命令行运行未完成，尚不能称为交付成功的移动入口；没有导出或发布用户现有快捷指令。后续必须验证文件实际到达、同名保存、多图与 iCloud 同步，再给入口 PASS。
 
 ## HTTP：自建接口 v1
 

@@ -155,6 +155,20 @@ class Store:
             )
             self.event("first_review", op_id, {"day": day, "review_id": review_id})
 
+    def mining_paused(self, pending):
+        with self.transaction():
+            row = self.db.execute("SELECT value FROM settings WHERE key='mining_paused'").fetchone()
+            paused = bool(row and row[0] == "true")
+            if pending >= 60:
+                paused = True
+            elif pending < 30:
+                paused = False
+            self.db.execute(
+                "INSERT OR REPLACE INTO settings VALUES('mining_paused',?)",
+                ("true" if paused else "false",),
+            )
+            return paused
+
     def status(self):
         return {
             table: [
