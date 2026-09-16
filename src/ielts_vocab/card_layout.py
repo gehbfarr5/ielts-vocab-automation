@@ -5,13 +5,12 @@ FRONT = """<main class="sheet">
 <h1>{{RecognitionPrompt}}</h1>
 <div class="pronunciation-grid">
 <div class="pronunciation-row primary"><span class="badge">US · 主</span>
-<div class="ipa">{{#IPA_US}}{{IPA_US}}{{/IPA_US}}{{^IPA_US}}音标待核验{{/IPA_US}}</div>
-<div class="audio">{{#PronunciationText}}{{tts en_US:PronunciationText}}{{/PronunciationText}}{{^PronunciationText}}{{tts en_US:Lemma}}{{/PronunciationText}}</div></div>
+<div class="ipa">{{#IPA_US}}{{IPA_US}}{{/IPA_US}}</div>
+<div class="audio">{{#PronunciationText}}{{tts en_US voices=Apple_Samantha:PronunciationText}}{{/PronunciationText}}{{^PronunciationText}}{{tts en_US voices=Apple_Samantha:Lemma}}{{/PronunciationText}}</div></div>
 <div class="pronunciation-row"><span class="badge">UK</span>
-<div class="ipa">{{#IPA_UK}}{{IPA_UK}}{{/IPA_UK}}{{^IPA_UK}}音标待核验{{/IPA_UK}}</div>
+<div class="ipa">{{#IPA_UK}}{{IPA_UK}}{{/IPA_UK}}</div>
 <div class="audio">{{#PronunciationText}}{{tts en_GB:PronunciationText}}{{/PronunciationText}}{{^PronunciationText}}{{tts en_GB:Lemma}}{{/PronunciationText}}</div></div>
 </div>
-{{#IPA_Note}}<p class="ipa-note">{{IPA_Note}}</p>{{/IPA_Note}}
 <p class="hint">回想它在阅读中的含义</p>
 </main>"""
 
@@ -21,7 +20,7 @@ BACK = """<main class="sheet">
 <section id="answer"><h2>核心含义</h2><p class="meaning">{{PrimaryMeaning}}</p></section>
 {{#PrimarySentence}}<section><h2>原文例句 <span class="badge">US</span></h2>
 <p class="sentence">{{PrimarySentence}}</p>
-<div class="pronunciation">{{tts en_US:PrimarySentence}}</div></section>{{/PrimarySentence}}
+<div class="pronunciation">{{tts en_US voices=Apple_Samantha:PrimarySentence}}</div></section>{{/PrimarySentence}}
 {{#Collocations}}<section><h2>搭配与用法</h2><div class="usage">{{Collocations}}</div></section>{{/Collocations}}
 {{#IPA_Source}}<details><summary>音标来源</summary><div class="metadata">{{IPA_Source}}</div></details>{{/IPA_Source}}
 {{#Sources}}<details><summary>查看来源</summary><div class="metadata">{{Sources}}</div></details>{{/Sources}}

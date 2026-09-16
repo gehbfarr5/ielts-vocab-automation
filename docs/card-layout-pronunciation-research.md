@@ -78,3 +78,13 @@ B：如要求多端音色一致，采用“同一模板+预生成MP3+有来源IP
 新增字段：IPA_US、IPA_UK、IPA_Note、IPA_Source。复用 Anki 原生 TTS，不新增音频下载器或远程播放脚本。既有 Note 原位扩展，保留 Note/Card ID 和复习历史；迁移前的字段、模板、样式、牌组预设及卡片快照仅保存在私有运行目录。自动分析尚不填充这些音标字段；后续应接入可核验的词典来源并保留出处。
 
 验证：三张现有验收卡已读回核对字段，正面生成两个播放标记、背面一个例句播放标记；原字段、ID、调度及复习计数保持不变，共享预设未变。实际移动端排版、语音与同步仍由后续实机验收确认。
+
+### 修订：仅单词音标；明确选择美音声音
+
+用户验收发现搭配音标影响排版，因此取代上面的关键词音标方案：仅单词填写 IPA；固定搭配/词组的 IPA_US、IPA_UK、IPA_Note、IPA_Source 留空，不显示待核验占位文案，保留双口音播放按钮。
+
+美音听感异常的本地选声原因：Anki 25.09.4 的 MacTTSPlayer 在未指定 voices 时匹配首个语言相符的声音；本机 `say` 列表首个 en_US 是 Albert，en_GB 是 Daniel。通过实际 Anki 类调用核验，空偏好选择 Apple_Albert，显式偏好选择 Apple_Samantha。所有美音标签改用 `voices=Apple_Samantha`，涵盖正面及例句。未修改全局系统音量或语速，UK 保持原样。
+
+证据：[Anki TTS 实现](https://github.com/ankitects/anki/blob/b3c23522d1e3cecdb2a2f999aa8cb32396fdb8b1/qt/aqt/tts.py)、[官方选声说明](https://docs.ankiweb.net/templates/fields.html#text-to-speech)。本次使用 GitHub code 搜索与本机安装源码，无需多代理或新依赖。复用原生 voices 配置；不采用预生成音频，因为本地选择错误已可直接修正。未能通过源码证明用户感知的响度差已消除，需要重新试听。其他设备若没有指定声音，Anki 原生会退回语言匹配，移动端选声需要单独验收。
+
+三卡读回与 50 项测试通过；两张搭配音标清除、单词音标保留、播放控件存在、调度字段不变。迁移前备份及迁移后读回均在私有 acceptance 目录。回滚使用 pre-samantha-backup.json 恢复模板与相关字段。
