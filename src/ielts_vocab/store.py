@@ -98,7 +98,7 @@ class Store:
             if not row:
                 raise ValueError("No verified learning-day budget")
             policy = DayState.model_validate_json(row[0])
-            if policy.recovery or not policy.reviews_clear or not policy.mobile_handoff_confirmed:
+            if policy.recovery or not policy.reviews_clear or not policy.handoff_ready:
                 raise ValueError("Review-first / sync-handoff gate closed")
             if not 0 <= time.time() - policy.history_verified_at <= 300:
                 raise ValueError("History snapshot expired; refresh before admission")
@@ -135,7 +135,7 @@ class Store:
         if not row:
             raise ValueError("No verified learning-day budget")
         policy = DayState.model_validate_json(row[0])
-        if policy.recovery or not policy.reviews_clear or not policy.mobile_handoff_confirmed:
+        if policy.recovery or not policy.reviews_clear or not policy.handoff_ready:
             raise ValueError("Review-first / sync-handoff gate closed")
         if not 0 <= time.time() - policy.history_verified_at <= 300:
             raise ValueError("History snapshot expired; refresh before admission")

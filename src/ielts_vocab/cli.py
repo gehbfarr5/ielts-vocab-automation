@@ -14,16 +14,15 @@ from pathlib import Path
 from .analysis import codex_analyze, evidence_pack, save_analysis
 from .anki import Anki, enrich, execute, make_plan, reconcile_reviews
 from .ingest import receive, scan
-from .models import Analysis, DayState, digest, study_day
+from .models import Analysis, Candidate, DayState, digest, study_day
+from .pronunciation import ipa_fields
 from .recognition import color_evidence, ocr, word_evidence
+from .runtime import read_config, require_writer
 from .service import serve, token_from_file
 from .store import Store
+from .unattended import refresh_day
 
 DEFAULT_ROOT = Path.home() / "Library/Application Support/IELTSVocab"
-
-
-def read_config(root):
-    return json.loads((root / "config.json").read_text())
 
 
 def anki_client(config):
@@ -33,7 +32,7 @@ def anki_client(config):
 
 def process(store, root, config):
     pending = store.db.execute(
-        "SELECT count(DISTINCT core_key) FROM candidates WHERE state='pending'"
+        "SELECT count(DISTINCT core_key) FROM candidates WHERE state IN ('pending','awaiting_pronunciation')"
     ).fetchone()[0]
     if store.mining_paused(pending):
         return {"state": "backpressure", "pending_cores": pending}
@@ -54,7 +53,7 @@ def process(store, root, config):
             work.mkdir(parents=True, exist_ok=True, mode=0o700)
             evidence = evidence_pack(row, lines, store)
             (work / "evidence.json").write_text(json.dumps(evidence, ensure_ascii=False, indent=2))
-            if not config.get("allow_cloud_images"):
+            if not (config.get("allow_cloud_images") or config.get("allow_cloud_text")):
                 store.db.execute(
                     "UPDATE submissions SET state='awaiting_analyzer' WHERE id=?", (sid,)
                 )
@@ -66,8 +65,17 @@ def process(store, root, config):
             ).fetchone()[0]
             if calls >= config.get("max_analyzer_calls_per_24h", 10):
                 raise ValueError("Analyzer rolling 24h call budget exhausted")
-            store.event("analyzer_call", sid, {"provider": "codex", "cloud_image": True})
-            analyzed = codex_analyze(Path(row["image"]), evidence, work, allow_cloud=True)
+            store.event(
+                "analyzer_call",
+                sid,
+                {"provider": "codex", "cloud_image": bool(config.get("allow_cloud_images"))},
+            )
+            analyzed = codex_analyze(
+                Path(row["image"]) if config.get("allow_cloud_images") else None,
+                evidence,
+                work,
+                allow_cloud=True,
+            )
             save_analysis(store, sid, analyzed, evidence, calibrated=config["calibration_verified"])
             results.append({"submission": sid, "state": "analyzed"})
         except Exception as e:
@@ -80,12 +88,17 @@ def process(store, root, config):
     return results
 
 
-def write_pending(store, config):
+def write_pending(store, config, prepared=None):
     if not config["writes_enabled"] or not config["legacy_inventory_reviewed"]:
         raise ValueError("Writes disabled until target inventory and acceptance are verified")
+    require_writer(config)
     a = anki_client(config)
     a.guard()
     a.setup(config["anki_deck"])
+    if config.get("history_authority") == "synced_mac":
+        readiness = prepared if prepared is not None else refresh_day(store, a, config)
+        if readiness["state"] != "ready":
+            return readiness
     reconcile_reviews(store, a, config["timezone"], config["rollover_hour"])
     day = study_day(datetime.now(timezone.utc), config["timezone"], config["rollover_hour"])
     # Existing uncertain operations must be reconciled before any new admission.
@@ -95,14 +108,36 @@ def write_pending(store, config):
     for op in unresolved:
         execute(store, a, op["id"], current_day=day)
     rows = store.db.execute(
-        "SELECT * FROM candidates WHERE state='pending' ORDER BY priority DESC,created LIMIT 5"
+        "SELECT * FROM candidates WHERE state IN ('pending','awaiting_pronunciation') ORDER BY priority DESC,created LIMIT 5"
     ).fetchall()
     for row in rows:
         plan = make_plan(store, a, row, config["anki_deck"])
         if plan["kind"] == "enrich":
             enrich(store, a, row, plan)
             continue
+        if plan["kind"] == "create":
+            ipa = ipa_fields(Candidate.model_validate_json(row["payload"]), config.get("ipa_cache"))
+            if ipa is None:
+                store.db.execute(
+                    "UPDATE candidates SET state='awaiting_pronunciation' WHERE id=?", (row["id"],)
+                )
+                continue
+            plan["fields"].update(ipa)
         op_id = digest([row["id"], plan["slot"]])[:32]
+        policy_row = store.db.execute("SELECT payload FROM days WHERE day=?", (day,)).fetchone()
+        if policy_row:
+            policy = DayState.model_validate_json(policy_row[0])
+            usage = store.usage(day)
+            existing_core = store.db.execute(
+                "SELECT 1 FROM operations WHERE core_key=? AND state!='cancelled'",
+                (row["core_key"],),
+            ).fetchone()
+            if (
+                usage["cards"] + 1 > policy.card_limit
+                or usage["cores"] + (not existing_core) > policy.core_limit
+                or usage["contexts"] + (plan["kind"] == "context") > policy.context_limit
+            ):
+                break
         store.reserve(
             op_id,
             row["id"],
@@ -113,9 +148,10 @@ def write_pending(store, config):
             plan,
         )
         execute(store, a, op_id, current_day=day)
-    a.call("sync")
-    store.db.execute("UPDATE operations SET state='sync_requested' WHERE state='written'")
-    store.event("sync_requested", day, {"mobile_verified": False})
+    if store.db.execute("SELECT 1 FROM operations WHERE state='written'").fetchone():
+        a.call("sync")
+        store.db.execute("UPDATE operations SET state='sync_requested' WHERE state='written'")
+        store.event("sync_requested", day, {"mobile_verified": False})
     return store.status()
 
 
@@ -212,6 +248,8 @@ def main():
                     "local_ocr": (root / "bin/vision-ocr").exists(),
                     "mode": "live" if config["writes_enabled"] else "shadow",
                     "cloud_images_enabled": config["allow_cloud_images"],
+                    "cloud_text_enabled": config.get("allow_cloud_text", False),
+                    "unattended_enabled": config.get("unattended_enabled", False),
                 }
                 try:
                     a = anki_client(config)
@@ -242,11 +280,25 @@ def main():
                     if args.command == "write-pending":
                         result = write_pending(store, config)
                     else:
+                        prepared = None
+                        if config["writes_enabled"] or config.get("unattended_enabled"):
+                            require_writer(config)
+                            if config.get("history_authority") == "synced_mac":
+                                prepared = refresh_day(store, anki_client(config), config)
                         if args.command == "run-once":
                             scan(store, root, Path(config["inbox"]))
                         result = process(store, root, config)
+                        if not config["writes_enabled"] and prepared is not None:
+                            result = {
+                                "analysis": result,
+                                "admission": prepared,
+                                "writes_enabled": False,
+                            }
                         if config["writes_enabled"]:
-                            result = {"analysis": result, "anki": write_pending(store, config)}
+                            result = {
+                                "analysis": result,
+                                "anki": write_pending(store, config, prepared),
+                            }
         print(json.dumps(result, ensure_ascii=False, indent=2))
     except Exception as e:
         print(

@@ -3,6 +3,7 @@
 import argparse
 import os
 import plistlib
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -27,7 +28,22 @@ for suffix, command in [("intake", "serve"), ("worker", "run-once")]:
         "ProgramArguments": [str(executable), "--root", str(a.root), command],
         "WorkingDirectory": str(repo),
         "RunAtLoad": True,
-        "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/bin:/bin"},
+        "EnvironmentVariables": {
+            "PATH": ":".join(
+                dict.fromkeys(
+                    [
+                        str(Path(shutil.which("codex")).parent)
+                        if shutil.which("codex")
+                        else "/usr/local/bin",
+                        str(executable.parent),
+                        "/opt/homebrew/bin",
+                        "/usr/local/bin",
+                        "/usr/bin",
+                        "/bin",
+                    ]
+                )
+            )
+        },
         "StandardOutPath": str(logs / (suffix + ".out.log")),
         "StandardErrorPath": str(logs / (suffix + ".err.log")),
         "Umask": 63,

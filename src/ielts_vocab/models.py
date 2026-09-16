@@ -101,6 +101,14 @@ class DayState(StrictModel):
     # A new snapshot must reflect all previously released cards and the study handoff.
     mobile_handoff_confirmed: bool = False
     exceptional_day: bool = False
+    history_authority: Literal["manual_handoff", "synced_mac"] = "manual_handoff"
+    sync_verified_at: float = 0
+
+    @property
+    def handoff_ready(self):
+        if self.history_authority == "synced_mac":
+            return self.sync_verified_at > 0 and self.history_verified_at >= self.sync_verified_at
+        return self.mobile_handoff_confirmed
 
     @model_validator(mode="after")
     def limits(self):

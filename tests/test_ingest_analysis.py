@@ -147,3 +147,28 @@ def test_deferred_candidate_can_be_reevaluated_without_duplicate(
     save_analysis(store, r["submission_id"], result, ev, calibrated=True)
     assert store.db.execute("SELECT count(*) FROM candidates").fetchone()[0] == 1
     assert store.db.execute("SELECT state FROM candidates").fetchone()[0] == "pending"
+
+
+def test_text_analyzer_omits_image_and_unrelated_lines(monkeypatch, tmp_path, candidate):
+    import subprocess
+
+    from ielts_vocab.analysis import codex_analyze
+
+    def run(command, **kwargs):
+        assert "--image" not in command
+        assert "UNRELATED_PRIVATE_LINE" not in kwargs["input"]
+        assert "maintain" in kwargs["input"]
+        (tmp_path / "result.json").write_text(
+            Analysis(candidates=[candidate], notes="").model_dump_json()
+        )
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    evidence = {
+        "ocr_lines": [{"text": "UNRELATED_PRIVATE_LINE"}]
+        + [{"text": "context"}] * 3
+        + [{"text": "maintain", "marked_spans": [{"text": "maintain"}]}]
+    }
+    assert (
+        codex_analyze(None, evidence, tmp_path, allow_cloud=True).candidates[0].lemma == "maintain"
+    )

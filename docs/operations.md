@@ -69,3 +69,9 @@ Recognition模板采用en_GB原生TTS，正面读PronunciationText（空时读Le
 2026-09-16 实测发现快捷指令的保存动作若只选 Shortcuts 且子路径留空，文件会落在根目录，后台 IELTSInbox 监听不会接收。保存动作须设置子路径 `/IELTSInbox/`，关闭询问位置及覆盖；验收必须以 iPad 实际生成文件进入该目录为准，Mac 编辑器设置成功不等于跨设备生效。不得把扫描扩大到整个 Shortcuts 根目录来掩盖路径错误。
 
 正式库连接和同步调用已验证，创建专用牌组及模板，单独设置每日显示25张。首次3卡同步验收经当前 Agent 核对后受控写入，尚不是无人值守流程通过。其私有输入状态为 supervised_sync_requested，避免重放；必须在正式自动导入前把这批既有卡纳入映射、历史与未学库存预算。显示限额不代替导入预算。自动写入与云图像开关仍关闭，移动端与保存目录实测通过前不迁移服务器。
+
+## 可迁移后台试运行（2026-09-17）
+
+`unattended_enabled`启用后台历史刷新与分析；`allow_cloud_text`只允许分析必要OCR文本，`allow_cloud_images`独立控制整图；`writes_enabled`单独控制写入。`history_authority=synced_mac`表示依据已同步到Mac的历史，不代表移动端无离线记录。`daily_new_limit`默认25，试运行3，自动模式最高30；特殊31–35不自动提升。`writer_host_id`必须匹配当前IOPlatformUUID。
+
+`anki_key_file`、`ipa_cache`可用数据目录相对路径；inbox由目标主机显式配置。不要把本机绝对用户路径当作Mac Server默认值。迁移前停两端worker、备份私有数据并禁用写入，使用deployment/relocate_state.py先dry-run检查路径，核对后apply；该工具不会启用目标机，也不负责关闭远端源worker。只有确认旧端停止后才可绑定新host。凭据与用户卡片仍不进Git。

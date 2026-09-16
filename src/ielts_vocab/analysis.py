@@ -23,7 +23,7 @@ No IELTS official frequency claims. CEFR/academic membership cannot be invented;
 academic score is null. Evidence refs must be IDs supplied below. Your gloss is explicitly
 an inference, not a dictionary quote. Never claim absent Anki history is evidence of mastery.
 Give minimal Chinese meaning, sense_label in short English, max 2 collocations, and honest
-uncertainties. Reuse the exact known sense_label when the meaning matches; otherwise DEFER unless a genuinely distinct important sense is clear. Treat marked_spans as approximate user selection, not exact card boundaries. Remove accidentally touched neighbouring words and grammatical inflections. Normalize the useful lemma or fixed expression; include adjacent words only when the supplied sentence and evidence clearly establish the same highlighted construction. Never mine unrelated unmarked vocabulary. Prefer transferable vocabulary and established collocations relevant to the learning goal, without claiming official IELTS frequency. Explain boundary changes in uncertainties. Line color_votes are diagnostics, never selection evidence. If marked_spans is empty, do not invent a target. Return JSON conforming to the supplied schema."""
+uncertainties. Reuse the exact known sense_label when the meaning matches; otherwise DEFER unless a genuinely distinct important sense is clear. Treat marked_spans as approximate user selection, not exact card boundaries. Remove accidentally touched neighbouring words and grammatical inflections. Normalize the useful lemma or fixed expression; include adjacent words only when the supplied sentence and evidence clearly establish the same highlighted construction. Never mine unrelated unmarked vocabulary. Prefer transferable vocabulary and established collocations relevant to the learning goal, without claiming official IELTS frequency. Explain justified boundary changes in reason, not uncertainties. uncertainties contains only unresolved doubts affecting admission. The fact that a gloss is inferred is provenance, not itself a doubt; put provenance in reason. If any unresolved uncertainty remains, decision MUST be DEFER, never ACCEPT. For ACCEPT, uncertainties MUST be an empty array. confidence is 0..1; gap, reuse, academic, context_impact and difficulty_fit are 0..100 scores (for example 75, not 0.75). Line color_votes are diagnostics, never selection evidence. If marked_spans is empty, do not invent a target. Return JSON conforming to the supplied schema."""
 
 
 def evidence_pack(submission, lines, store=None):
@@ -56,6 +56,15 @@ def evidence_pack(submission, lines, store=None):
                         "sense_id": row["sense_key"],
                     }
                 )
+    history = None
+    if store is not None:
+        snapshot = store.db.execute(
+            "SELECT value FROM settings WHERE key='synced_history'"
+        ).fetchone()
+        if snapshot:
+            observed = json.loads(snapshot[0])
+            if 0 <= time.time() - observed["observed_at"] <= 300:
+                history = observed
     return {
         "source_id": "source:" + submission["sha"],
         "mark_scheme": submission["mark_scheme"],
@@ -63,7 +72,7 @@ def evidence_pack(submission, lines, store=None):
         "ocr_lines": lines,
         "additional_evidence": frequency,
         "known_senses": known,
-        "anki_review_history": None,
+        "anki_review_history": history,
         "cefr": None,
         "academic_membership": None,
         "limitations": [
@@ -74,16 +83,31 @@ def evidence_pack(submission, lines, store=None):
     }
 
 
-def codex_analyze(image: Path, evidence: dict, work: Path, *, allow_cloud: bool):
+def codex_analyze(image: Path | None, evidence: dict, work: Path, *, allow_cloud: bool):
     if not allow_cloud:
-        raise ValueError("Cloud image processing is not enabled")
+        raise ValueError("Cloud analysis is not enabled")
     work.mkdir(parents=True, exist_ok=True, mode=0o700)
     schema = work / "analysis.schema.json"
     schema.write_text(json.dumps(Analysis.model_json_schema()))
     result_file = work / "result.json"
     # Input and output are isolated from project data. No inherited plugins/MCP/hooks.
     # CLI auth remains managed by Codex. Never export/copy its credentials.
-    prompt = INSTRUCTIONS + "\nEvidence:\n" + json.dumps(evidence, ensure_ascii=False)
+    lines = evidence["ocr_lines"]
+    selected = set()
+    for index, line in enumerate(lines):
+        if line.get("marked_spans"):
+            selected.update(range(max(0, index - 2), min(len(lines), index + 3)))
+    if not selected:
+        return Analysis(candidates=[], notes="No marked spans; no cloud request needed")
+    supplied = dict(evidence)
+    supplied["ocr_lines"] = [lines[i] for i in sorted(selected)]
+    text = " ".join(line["text"] for line in supplied["ocr_lines"]).casefold()
+    supplied["additional_evidence"] = [
+        item
+        for item in evidence.get("additional_evidence", [])
+        if item.get("kind") != "frequency" or item["form"].casefold() in text
+    ]
+    prompt = INSTRUCTIONS + "\nEvidence:\n" + json.dumps(supplied, ensure_ascii=False)
     command = [
         "codex",
         "exec",
@@ -116,10 +140,10 @@ def codex_analyze(image: Path, evidence: dict, work: Path, *, allow_cloud: bool)
         str(schema),
         "--output-last-message",
         str(result_file),
-        "--image",
-        str(image),
-        "-",
     ]
+    if image is not None:
+        command.extend(["--image", str(image)])
+    command.append("-")
     result = subprocess.run(command, input=prompt, text=True, capture_output=True, timeout=180)
     if result.returncode:
         # Logs may include user inputs; keep raw CLI output out of shared diagnostics.
