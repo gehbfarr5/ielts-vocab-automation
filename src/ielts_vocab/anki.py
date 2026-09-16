@@ -28,6 +28,10 @@ FIELDS = [
     "Sources",
     "UserNotes",
     "PronunciationText",
+    "IPA_US",
+    "IPA_UK",
+    "IPA_Note",
+    "IPA_Source",
 ]
 TEMPLATES = [
     {

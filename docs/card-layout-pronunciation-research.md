@@ -66,3 +66,15 @@ B：如要求多端音色一致，采用“同一模板+预生成MP3+有来源IP
 官方依据：[原生TTS](https://docs.ankiweb.net/templates/fields.html#text-to-speech-for-individual-fields)、[AnkiMobile语音](https://docs.ankimobile.net/tts.html)、[媒体存储](https://docs.ankiweb.net/media.html)、[媒体同步完成条件](https://faqs.ankiweb.net/media-files-may-take-time-to-sync.html)、[HyperTTS功能](https://www.vocab.ai/hypertts)、[ankglish内容许可边界](https://github.com/UltiRequiem/ankglish/blob/main/SOURCES.md)。
 
 结论：方案证据较充分；实际设备排版、音质、IPA覆盖率未验收。调研完成；修复轮数0；澄清0；耗时、模型强度、可用额度未知。
+
+## 2026-09-16：美音优先与双口音音标
+
+用户选择美音为主口音，保留英音。Recognition 正面采用两行 US / UK：口音标签、对应音标、原生 TTS 按钮；例句使用 en_US。音标来源折叠在背面，避免挤占释义和例句。缺少已核验音标时显示“音标待核验”，不能由拼写猜测后自动填入。
+
+当前验收牌组使用单独克隆的预设，关闭自动播放，避免英美两条原生 TTS 连播；共享默认预设及学习参数保持原值。两个按钮均可点播，US 排第一。此设置仅应用于当前验收牌组，未来正式牌组需要显式沿用。
+
+单词可以显示完整词典音标；固定搭配若没有可靠的整条音标，按词展示关键词音标，并注明“关键词音标；播放按钮朗读完整搭配”。不得把拼接的单词音标称为已核验的搭配连读转写。词典音标与合成语音来自不同系统，不承诺逐音完全相同。
+
+新增字段：IPA_US、IPA_UK、IPA_Note、IPA_Source。复用 Anki 原生 TTS，不新增音频下载器或远程播放脚本。既有 Note 原位扩展，保留 Note/Card ID 和复习历史；迁移前的字段、模板、样式、牌组预设及卡片快照仅保存在私有运行目录。自动分析尚不填充这些音标字段；后续应接入可核验的词典来源并保留出处。
+
+验证：三张现有验收卡已读回核对字段，正面生成两个播放标记、背面一个例句播放标记；原字段、ID、调度及复习计数保持不变，共享预设未变。实际移动端排版、语音与同步仍由后续实机验收确认。

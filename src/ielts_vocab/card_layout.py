@@ -3,9 +3,15 @@
 FRONT = """<main class="sheet">
 <div class="eyebrow">词汇 · RECOGNITION</div>
 <h1>{{RecognitionPrompt}}</h1>
-<div class="pronunciation"><span class="badge">UK</span>
-{{#PronunciationText}}{{tts en_GB:PronunciationText}}{{/PronunciationText}}
-{{^PronunciationText}}{{tts en_GB:Lemma}}{{/PronunciationText}}</div>
+<div class="pronunciation-grid">
+<div class="pronunciation-row primary"><span class="badge">US · 主</span>
+<div class="ipa">{{#IPA_US}}{{IPA_US}}{{/IPA_US}}{{^IPA_US}}音标待核验{{/IPA_US}}</div>
+<div class="audio">{{#PronunciationText}}{{tts en_US:PronunciationText}}{{/PronunciationText}}{{^PronunciationText}}{{tts en_US:Lemma}}{{/PronunciationText}}</div></div>
+<div class="pronunciation-row"><span class="badge">UK</span>
+<div class="ipa">{{#IPA_UK}}{{IPA_UK}}{{/IPA_UK}}{{^IPA_UK}}音标待核验{{/IPA_UK}}</div>
+<div class="audio">{{#PronunciationText}}{{tts en_GB:PronunciationText}}{{/PronunciationText}}{{^PronunciationText}}{{tts en_GB:Lemma}}{{/PronunciationText}}</div></div>
+</div>
+{{#IPA_Note}}<p class="ipa-note">{{IPA_Note}}</p>{{/IPA_Note}}
 <p class="hint">回想它在阅读中的含义</p>
 </main>"""
 
@@ -13,10 +19,11 @@ BACK = """<main class="sheet">
 <div class="eyebrow">词汇 · RECOGNITION</div>
 <h1>{{RecognitionPrompt}}</h1>
 <section id="answer"><h2>核心含义</h2><p class="meaning">{{PrimaryMeaning}}</p></section>
-{{#PrimarySentence}}<section><h2>原文例句 <span class="badge">UK</span></h2>
+{{#PrimarySentence}}<section><h2>原文例句 <span class="badge">US</span></h2>
 <p class="sentence">{{PrimarySentence}}</p>
-<div class="pronunciation">{{tts en_GB:PrimarySentence}}</div></section>{{/PrimarySentence}}
+<div class="pronunciation">{{tts en_US:PrimarySentence}}</div></section>{{/PrimarySentence}}
 {{#Collocations}}<section><h2>搭配与用法</h2><div class="usage">{{Collocations}}</div></section>{{/Collocations}}
+{{#IPA_Source}}<details><summary>音标来源</summary><div class="metadata">{{IPA_Source}}</div></details>{{/IPA_Source}}
 {{#Sources}}<details><summary>查看来源</summary><div class="metadata">{{Sources}}</div></details>{{/Sources}}
 {{#UserNotes}}<details><summary>备注</summary><div class="metadata">{{UserNotes}}</div></details>{{/UserNotes}}
 </main>"""
@@ -32,6 +39,16 @@ section {margin-top:24px;padding-top:20px;border-top:1px solid #e5e8eb;}
 p {margin:0 0 10px;}.meaning {font-size:22px;font-weight:550;}
 .sentence {line-height:1.8;}.sentence b {color:#526b9d;}
 .pronunciation {display:flex;align-items:center;gap:10px;min-height:44px;}
+.pronunciation-grid {display:grid;gap:8px;margin:12px 0;}
+.pronunciation-row {display:grid;grid-template-columns:58px minmax(0,1fr) 42px;gap:10px;
+align-items:center;padding:9px 10px;border:1px solid #e5e8eb;border-radius:10px;}
+.pronunciation-row.primary {background:#f3f6fb;border-color:#ccd7ea;}
+.ipa {font-family:"DejaVu Sans","Arial",sans-serif;font-size:17px;line-height:1.65;overflow-wrap:anywhere;}
+.ipa-note {font-size:12px;color:#697585;margin:10px 0;}
+.audio {display:flex;align-items:center;justify-content:center;}
+.nightMode .pronunciation-row {border-color:#3b4552;}
+.nightMode .pronunciation-row.primary {background:#2a3545;border-color:#526684;}
+.nightMode .ipa-note {color:#aab6c6;}
 .badge {display:inline-block;border-radius:5px;background:#edf0f6;color:#526b9d;
 font-size:11px;padding:2px 7px;letter-spacing:.03em;vertical-align:middle;}
 .replay-button svg {width:38px;height:38px;}.hint {font-size:14px;color:#7b8490;margin-top:16px;}
