@@ -149,12 +149,14 @@ def reconcile_reviews(store, anki, timezone_name, rollover_hour):
 
 
 def render(candidate: Candidate):
+    from .enrichment import render_enrichment
+
     return {
         "RecognitionPrompt": html.escape(candidate.lemma),
         "PronunciationText": html.escape(candidate.lemma),
         "PrimaryMeaning": html.escape(candidate.context_meaning_zh),
         "PrimarySentence": html.escape(candidate.source_sentence),
-        "Collocations": "<br>".join(map(html.escape, candidate.collocations)),
+        "Collocations": render_enrichment(candidate),
     }
 
 

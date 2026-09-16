@@ -42,7 +42,27 @@ class Evidence(StrictModel):
     version: str | None
 
 
+class LearningNote(StrictModel):
+    text: str = Field(min_length=1, max_length=220)
+    evidence_refs: list[str] = Field(min_length=1, max_length=3)
+
+
+class Enrichment(StrictModel):
+    core_image_zh: str = Field(min_length=1, max_length=180)
+    usage: str = Field(min_length=1, max_length=150)
+    usage_zh: str = Field(min_length=1, max_length=100)
+    usage_kind: Literal["source_expression", "dictionary_usage"]
+    usage_refs: list[str] = Field(min_length=1, max_length=3)
+    word_notes: list[LearningNote] = Field(max_length=2)
+    example_en: str = Field(min_length=1, max_length=220)
+    example_zh: str = Field(min_length=1, max_length=180)
+    recall_question: str = Field(min_length=1, max_length=160)
+    recall_answer: str = Field(min_length=1, max_length=160)
+    omitted_reason: str = Field(max_length=250)
+
+
 class Candidate(StrictModel):
+    enrichment: Enrichment | None = None
     surface_form: str = Field(min_length=1, max_length=150)
     lemma: str = Field(min_length=1, max_length=120)
     part_of_speech: str = Field(max_length=50)

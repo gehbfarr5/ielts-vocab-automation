@@ -62,6 +62,13 @@ def process(store, root, config):
             work = root / "analysis" / sid
             work.mkdir(parents=True, exist_ok=True, mode=0o700)
             evidence = evidence_pack(row, lines, store)
+            evidence["semantic_enrichment_enabled"] = config.get(
+                "semantic_enrichment_enabled", False
+            )
+            if evidence["semantic_enrichment_enabled"]:
+                from .enrichment import dictionary_evidence
+
+                evidence["additional_evidence"].extend(dictionary_evidence(lines, root, store))
             (work / "evidence.json").write_text(json.dumps(evidence, ensure_ascii=False, indent=2))
             if not (config.get("allow_cloud_images") or config.get("allow_cloud_text")):
                 store.db.execute(

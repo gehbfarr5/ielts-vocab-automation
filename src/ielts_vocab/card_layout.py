@@ -21,7 +21,7 @@ BACK = """<main class="sheet">
 {{#PrimarySentence}}<section><h2>原文例句 <span class="badge">US</span></h2>
 <p class="sentence">{{PrimarySentence}}</p>
 <div class="pronunciation default-audio">{{tts en_US voices=Apple_Samantha,Apple_Samantha_(英语（美国）):PrimarySentence}}</div></section>{{/PrimarySentence}}
-{{#Collocations}}<section><h2>搭配与用法</h2><div class="usage">{{Collocations}}</div></section>{{/Collocations}}
+{{#Collocations}}<section><h2>理解与用法</h2><div class="usage">{{Collocations}}</div></section>{{/Collocations}}
 {{#IPA_Source}}<details><summary>音标来源</summary><div class="metadata">{{IPA_Source}}</div></details>{{/IPA_Source}}
 {{#Sources}}<details><summary>查看来源</summary><div class="metadata">{{Sources}}</div></details>{{/Sources}}
 {{#UserNotes}}<details><summary>备注</summary><div class="metadata">{{UserNotes}}</div></details>{{/UserNotes}}
@@ -75,4 +75,12 @@ a {color:#526b9d;}.nightMode.card {background:#171c23;color:#e8edf3;}
 .nightMode a,.nightMode .sentence b {color:#afc5ef;}
 @media(max-width:480px){.card{padding:12px 8px;font-size:18px;}.sheet{padding:22px 18px;}
 h1{font-size:28px;}.meaning{font-size:21px;}}
+"""
+
+CSS += """
+.learning-extra {font-size:16px;line-height:1.8;}
+.learning-extra p {margin:14px 0;}
+.learning-extra summary {font-size:15px;min-height:44px;}
+.usage small {font-size:12px;color:#697585;}
+.nightMode .usage small {color:#aab6c6;}
 """
