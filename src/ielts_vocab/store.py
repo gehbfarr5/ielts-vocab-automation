@@ -42,6 +42,12 @@ class Store:
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.executescript(DDL)
+        with self.transaction():
+            columns = {row[1] for row in self.db.execute("PRAGMA table_info(submissions)")}
+            if "mark_scheme" not in columns:
+                self.db.execute(
+                    "ALTER TABLE submissions ADD COLUMN mark_scheme TEXT NOT NULL DEFAULT 'yellow-orange-blue-v1'"
+                )
         path.chmod(0o600)
 
     @contextmanager

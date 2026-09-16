@@ -12,6 +12,7 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
+from .palette import CURRENT_SCHEME
 from .store import Store
 
 MAX_BYTES = 20 * 1024 * 1024
@@ -80,11 +81,11 @@ def receive(store: Store, root: Path, data: bytes, submission_id: str | None = N
             os.fsync(f.fileno())
         image.chmod(0o600)
         store.db.execute(
-            "INSERT INTO submissions(id,sha,image,created) VALUES(?,?,?,?)",
-            (sid, sha, str(image), time.time()),
+            "INSERT INTO submissions(id,sha,image,created,mark_scheme) VALUES(?,?,?,?,?)",
+            (sid, sha, str(image), time.time(), CURRENT_SCHEME),
         )
         store.db.execute("INSERT INTO receipts VALUES(?,?,?)", (sid, sha, sid))
-        store.event("received", sid, {"sha256": sha})
+        store.event("received", sid, {"sha256": sha, "mark_scheme": CURRENT_SCHEME})
     return {"submission_id": sid, "state": "received", "duplicate": False}
 
 

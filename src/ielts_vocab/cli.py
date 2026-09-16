@@ -45,7 +45,9 @@ def process(store, root, config):
         sid = row["id"]
         try:
             lines = color_evidence(
-                Path(row["image"]), ocr(Path(row["image"]), root / "bin/vision-ocr")
+                Path(row["image"]),
+                ocr(Path(row["image"]), root / "bin/vision-ocr"),
+                scheme=row["mark_scheme"],
             )
             work = root / "analysis" / sid
             work.mkdir(parents=True, exist_ok=True, mode=0o700)

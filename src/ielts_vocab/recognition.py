@@ -7,6 +7,8 @@ from pathlib import Path
 
 from PIL import Image
 
+from .palette import CURRENT_SCHEME, LEGACY_SCHEME, palette_for
+
 
 def ocr(image: Path, binary: Path):
     if not binary.is_file():
@@ -17,8 +19,9 @@ def ocr(image: Path, binary: Path):
     return json.loads(result.stdout)
 
 
-def color_evidence(image: Path, lines: list[dict]):
+def color_evidence(image: Path, lines: list[dict], scheme=CURRENT_SCHEME):
     """Diagnostic hue votes per OCR line. Never considered calibrated acceptance evidence."""
+    palette = palette_for(scheme)
     with Image.open(image) as src:
         im = src.convert("RGB")
     output = []
@@ -34,16 +37,26 @@ def color_evidence(image: Path, lines: list[dict]):
         )
         region.thumbnail((300, 40))
         votes = dict.fromkeys(("unknown", "partial", "phrase_context_unclear"), 0)
-        for r, g, b in region.getdata():
+        pixels = region.load()
+        for r, g, b in (pixels[x, y] for y in range(region.height) for x in range(region.width)):
             hue, sat, val = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
-            if sat < 0.18 or val < 0.35:
+            if sat < (0.18 if scheme == LEGACY_SCHEME else 0.07) or val < 0.35:
                 continue
             deg = hue * 360
-            if 43 <= deg <= 75:
+            if scheme != LEGACY_SCHEME:
+                distances = {}
+                for label, color in palette.items():
+                    rgb = [int(color[i : i + 2], 16) / 255 for i in (1, 3, 5)]
+                    target = colorsys.rgb_to_hsv(*rgb)[0] * 360
+                    distances[label] = abs((deg - target + 180) % 360 - 180)
+                closest = min(distances, key=distances.get)
+                if distances[closest] <= 18:
+                    votes[closest] += 1
+            elif 43 <= deg <= 75:
                 votes["unknown"] += 1
             elif 15 <= deg < 43:
                 votes["partial"] += 1
             elif 175 <= deg <= 250:
                 votes["phrase_context_unclear"] += 1
-        output.append({**line, "color_votes": votes, "calibrated": False})
+        output.append({**line, "color_votes": votes, "calibrated": False, "mark_scheme": scheme})
     return output

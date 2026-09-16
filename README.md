@@ -4,7 +4,7 @@
 
 **v0.1 是开发预览：本地收件、OCR、队列与 Anki 安全写入已实现；默认 shadow 模式，不会自动写入个人词库。尚未完成正式 Level D 验收。**
 
-- 黄色：unknown；橙色：partial；蓝色：phrase/context unclear。
+- 金黄 `#E6C162`：unknown；豆沙粉 `#BF8486`：partial；灰蓝 `#6E83B0`：phrase/context unclear。见[配色规范 v2](docs/mark-colors.md)。
 - 主动共享图片或将图片放入固定 iCloud 文件夹，两种入口共用队列。
 - SQLite 持久收件、SHA-256 去重、提交 ID 重放保护、失败状态与审计事件。
 - Apple Vision 在 Mac 本地识别英文，颜色区域提供辅助证据。
