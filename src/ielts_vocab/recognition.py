@@ -60,3 +60,72 @@ def color_evidence(image: Path, lines: list[dict], scheme=CURRENT_SCHEME):
                 votes["phrase_context_unclear"] += 1
         output.append({**line, "color_votes": votes, "calibrated": False, "mark_scheme": scheme})
     return output
+
+
+def word_evidence(image: Path, lines: list[dict], scheme=CURRENT_SCHEME):
+    """Conservative light-page diagnostics; never a calibrated admission signal.
+
+    Use real Vision word boxes, reject dark/saturated interface backgrounds, and
+    require substantial word coverage so a stroke touching a neighbour is not a mark.
+    """
+    with Image.open(image) as source:
+        im = source.convert("RGB")
+
+    def crop(box):
+        x, y, w, h = box
+        region = im.crop(
+            (
+                int(x * im.width),
+                int(y * im.height),
+                int((x + w) * im.width),
+                int((y + h) * im.height),
+            )
+        )
+        region.thumbnail((300, 40))
+        return region
+
+    output = []
+    for line in lines:
+        if "words" not in line:
+            raise ValueError("Word boxes missing: rebuild the Vision helper before processing")
+        region = crop(line["bbox"])
+        pixels = region.load()
+        area = region.width * region.height
+        light = sum(
+            value >= 0.75 and saturation <= 0.65
+            for _, saturation, value in (
+                colorsys.rgb_to_hsv(*(c / 255 for c in pixels[x, y]))
+                for y in range(region.height)
+                for x in range(region.width)
+            )
+        ) / max(1, area)
+        eligible = light >= 0.70 and line["confidence"] >= 0.8
+        words = color_evidence(image, line["words"], scheme)
+        marks = []
+        previous_index = -2
+        for index, word in enumerate(words):
+            r = crop(word["bbox"])
+            votes = word["color_votes"]
+            label = max(votes, key=votes.get)
+            coverage = votes[label] / max(1, r.width * r.height)
+            dominance = votes[label] / max(1, sum(votes.values()))
+            word["coverage"] = round(coverage, 3)
+            word["mark"] = label if eligible and coverage >= 0.30 and dominance >= 0.80 else None
+            if word["mark"]:
+                if marks and previous_index == index - 1 and marks[-1]["mark"] == label:
+                    marks[-1]["text"] += " " + word["text"]
+                    marks[-1]["word_indices"].append(index)
+                else:
+                    marks.append({"text": word["text"], "mark": label, "word_indices": [index]})
+                previous_index = index
+        output.append(
+            {
+                **line,
+                "words": words,
+                "marked_spans": marks,
+                "light_page_eligible": eligible,
+                "light_fraction": round(light, 3),
+                "calibrated": False,
+            }
+        )
+    return output

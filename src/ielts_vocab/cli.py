@@ -15,7 +15,7 @@ from .analysis import codex_analyze, evidence_pack, save_analysis
 from .anki import Anki, enrich, execute, make_plan, reconcile_reviews
 from .ingest import receive, scan
 from .models import Analysis, DayState, digest, study_day
-from .recognition import color_evidence, ocr
+from .recognition import color_evidence, ocr, word_evidence
 from .service import serve, token_from_file
 from .store import Store
 
@@ -49,6 +49,7 @@ def process(store, root, config):
                 ocr(Path(row["image"]), root / "bin/vision-ocr"),
                 scheme=row["mark_scheme"],
             )
+            lines = word_evidence(Path(row["image"]), lines, scheme=row["mark_scheme"])
             work = root / "analysis" / sid
             work.mkdir(parents=True, exist_ok=True, mode=0o700)
             evidence = evidence_pack(row, lines, store)

@@ -23,7 +23,7 @@ No IELTS official frequency claims. CEFR/academic membership cannot be invented;
 academic score is null. Evidence refs must be IDs supplied below. Your gloss is explicitly
 an inference, not a dictionary quote. Never claim absent Anki history is evidence of mastery.
 Give minimal Chinese meaning, sense_label in short English, max 2 collocations, and honest
-uncertainties. Reuse the exact known sense_label when the meaning matches; otherwise DEFER unless a genuinely distinct important sense is clear. Extract only marked targets. Return JSON conforming to the supplied schema."""
+uncertainties. Reuse the exact known sense_label when the meaning matches; otherwise DEFER unless a genuinely distinct important sense is clear. Extract only targets within marked_spans. Line color_votes are diagnostics, never selection evidence. If marked_spans is empty, do not invent a target. Return JSON conforming to the supplied schema."""
 
 
 def evidence_pack(submission, lines, store=None):
